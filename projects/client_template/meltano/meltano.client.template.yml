@@ -1,0 +1,30 @@
+# Template de configuration Meltano pour un nouveau client.
+# Copier les sections utiles dans meltano/meltano.yml et adapter les chemins.
+
+plugins:
+  extractors:
+    - name: tap-csv
+      variant: meltanolabs
+      pip_url: git+https://github.com/MeltanoLabs/tap-csv.git@v1.1.1
+      config:
+        files:
+          - entity: orders
+            path: /project/projects/<nom_client>/data/Orders.csv
+            keys: [order_id]
+          - entity: customers
+            path: /project/projects/<nom_client>/data/Customers.csv
+            keys: [customer_id]
+  loaders:
+    - name: target-postgres
+      variant: transferwise
+      config:
+        host: ${PG_HOST}
+        port: ${PG_PORT}
+        user: ${PG_USER}
+        password: ${PG_PASSWORD}
+        dbname: ${PG_DB}
+        default_target_schema: raw
+
+# Exécution type:
+# meltano install
+# meltano run tap-csv target-postgres

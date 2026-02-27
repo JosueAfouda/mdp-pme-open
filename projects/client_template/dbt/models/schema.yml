@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_client_orders
+    description: "Template staging orders"
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        data_tests:
+          - not_null
+      - name: order_date
+        data_tests:
+          - not_null
+
+  - name: mart_client_daily_kpis
+    description: "Template daily KPIs"
+    columns:
+      - name: order_date
+        data_tests:
+          - not_null
+          - unique

@@ -38,33 +38,41 @@ Avec ce modèle :
 
 ## Checklist de démarrage (nouveau client)
 
-1. Créer un dossier client :
+1. Copier le scaffold prêt à l'emploi :
+```bash
+cp -R projects/client_template projects/<nom_client>
+```
+
+2. (Optionnel) Créer un dossier client vide manuellement :
 ```bash
 mkdir -p projects/<nom_client>/{data,docs}
 ```
 
-2. Placer les fichiers source du client dans :
+3. Placer les fichiers source du client dans :
 ```text
 projects/<nom_client>/data
 ```
 
-3. Adapter l'ingestion dans [meltano.yml](/home/vant/Documents/business/mdp-pme-open/meltano/meltano.yml#L1) :
+4. Adapter l'ingestion dans [meltano.yml](/home/vant/Documents/business/mdp-pme-open/meltano/meltano.yml#L1) en partant du template [meltano.client.template.yml](/home/vant/Documents/business/mdp-pme-open/projects/client_template/meltano/meltano.client.template.yml#L1) :
 - nouveaux streams/fichiers ;
 - clés primaires ;
 - mapping de colonnes ;
 - chargement vers le schéma `raw`.
 
-4. Adapter les volumes du service `meltano` dans [docker-compose.yml](/home/vant/Documents/business/mdp-pme-open/docker-compose.yml#L50) pour monter le dossier data client (lecture seule), par exemple :
+5. Adapter les volumes du service `meltano` dans [docker-compose.yml](/home/vant/Documents/business/mdp-pme-open/docker-compose.yml#L50) pour monter le dossier data client (lecture seule), par exemple :
 ```yaml
 - ./projects/<nom_client>/data:/project/projects/<nom_client>/data:ro
 ```
 
-5. Construire les modèles dbt dans [dbt](/home/vant/Documents/business/mdp-pme-open/dbt#L1) :
+6. Construire les modèles dbt dans [dbt](/home/vant/Documents/business/mdp-pme-open/dbt#L1) en partant des templates :
+- [stg_client_orders.sql](/home/vant/Documents/business/mdp-pme-open/projects/client_template/dbt/models/stg/stg_client_orders.sql#L1)
+- [mart_client_daily_kpis.sql](/home/vant/Documents/business/mdp-pme-open/projects/client_template/dbt/models/mart/mart_client_daily_kpis.sql#L1)
+- [schema.yml](/home/vant/Documents/business/mdp-pme-open/projects/client_template/dbt/models/schema.yml#L1)
 - `stg_*` : normalisation ;
 - `mart_*` : KPI métier ;
 - tests de qualité (`not_null`, `unique`, `relationships`).
 
-6. Démarrer et exécuter la chaîne :
+7. Démarrer et exécuter la chaîne :
 ```bash
 make up
 make load
@@ -72,9 +80,9 @@ make bi
 make check
 ```
 
-7. Construire les datasets/charts Superset pour le client.
+8. Construire les datasets/charts Superset pour le client.
 
-8. Documenter le projet client dans :
+9. Documenter le projet client dans :
 ```text
 projects/<nom_client>/docs
 ```

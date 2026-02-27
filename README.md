@@ -20,6 +20,7 @@ Documentation détaillée :
 - [Démo Stroopwafelshop](/demo/DEMO_STROOPWAFELSHOP.md)
 - [Aperçu métier des données](/demo/data/APERCU_DONNEES.md)
 - [Starter kit nouveau client](/demo/STARTER_KIT_NOUVEAU_CLIENT.md)
+- [Scaffold projet client](/projects/client_template/README.md)
 
 ## Prérequis
 
