@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_employees
+    columns:
+      - name: employee_id
+        data_tests: [not_null, unique]
+      - name: full_name
+        data_tests: [not_null]
+
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+      - name: product_name
+        data_tests: [not_null]
+
+  - name: stg_promotions
+    columns:
+      - name: promotion_id
+        data_tests: [not_null, unique]
+      - name: product_id
+        data_tests:
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+
+  - name: stg_sales
+    columns:
+      - name: sales_id
+        data_tests: [not_null, unique]
+      - name: employee_id
+        data_tests:
+          - relationships:
+              to: ref('stg_employees')
+              field: employee_id
+
+  - name: stg_sales_lines
+    columns:
+      - name: sales_line_id
+        data_tests: [not_null, unique]
+      - name: sales_id
+        data_tests:
+          - relationships:
+              to: ref('stg_sales')
+              field: sales_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+
+  - name: stg_shifts
+    columns:
+      - name: shift_id
+        data_tests: [not_null, unique]
+      - name: employee_id
+        data_tests:
+          - relationships:
+              to: ref('stg_employees')
+              field: employee_id

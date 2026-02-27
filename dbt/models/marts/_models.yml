@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: dim_employees
+    description: "Dimension des employés du magasin."
+    columns:
+      - name: employee_id
+        data_tests: [not_null, unique]
+
+  - name: dim_products
+    description: "Dimension des produits vendus par le magasin."
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: dim_promotions
+    description: "Dimension des promotions utilisées sur les ventes."
+    columns:
+      - name: promotion_id
+        data_tests: [not_null, unique]
+
+  - name: dim_shifts
+    description: "Planning des shifts employés."
+    columns:
+      - name: shift_id
+        data_tests: [not_null, unique]
+
+  - name: fct_sales_lines
+    description: "Fait détaillé des lignes de vente enrichies avec produit, employé et promotion."
+    columns:
+      - name: sales_line_id
+        data_tests: [not_null, unique]
+
+  - name: mart_daily_sales_kpis
+    description: "KPI journaliers principaux pour le tableau de bord PME."
+    columns:
+      - name: sold_date
+        data_tests: [not_null, unique]
+
+  - name: mart_product_sales_kpis
+    description: "KPI de ventes par jour et par type de gaufre."
+    columns:
+      - name: product_day_key
+        data_tests: [not_null, unique]

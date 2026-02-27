@@ -1,0 +1,230 @@
+name: mdp_mvp
+
+networks:
+  mdp_net:
+
+volumes:
+  pg_data:
+  airflow_db:
+  airflow_logs:
+  superset_home:
+
+services:
+  # -------------------------
+  # Data Warehouse (Postgres)
+  # -------------------------
+  postgres:
+    image: postgres:16
+    container_name: mdp_postgres
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - mdp_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    profiles: ["core", "bi", "dev"]
+
+  adminer:
+    image: adminer:4
+    container_name: mdp_adminer
+    ports:
+      - "${HOST_BIND}:${ADMINER_PORT}:8080"
+    networks:
+      - mdp_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["dev"]
+
+  # -------------------------
+  # Meltano (Ingestion)
+  # - Runs ELT on demand (via Airflow or manual docker compose run)
+  # -------------------------
+  meltano:
+    image: meltano/meltano:latest
+    container_name: mdp_meltano
+    working_dir: /project
+    environment:
+      # meltano uses this for config + runs
+      MELTANO_PROJECT_ROOT: /project
+      # convenience connection envs used by meltano.yml
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DB: ${PG_DB}
+    volumes:
+      - ./meltano:/project
+      - ./demo/data:/project/demo/data:ro
+    networks:
+      - mdp_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["--version"]
+    profiles: ["core"]
+
+  # -------------------------
+  # Airflow metadata DB
+  # -------------------------
+  airflow_postgres:
+    image: postgres:16
+    container_name: mdp_airflow_postgres
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    volumes:
+      - airflow_db:/var/lib/postgresql/data
+    networks:
+      - mdp_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    profiles: ["core"]
+
+  airflow_init:
+    image: apache/airflow:2.9.3
+    container_name: mdp_airflow_init
+    depends_on:
+      airflow_postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      _AIRFLOW_WWW_USER_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
+      _AIRFLOW_WWW_USER_FIRSTNAME: Admin
+      _AIRFLOW_WWW_USER_LASTNAME: Admin
+    command: >
+      bash -c "
+      airflow db migrate &&
+      airflow users create
+        --username ${AIRFLOW_ADMIN_USER}
+        --password ${AIRFLOW_ADMIN_PASSWORD}
+        --firstname Admin
+        --lastname Admin
+        --role Admin
+        --email ${AIRFLOW_ADMIN_EMAIL} || true
+      "
+    networks:
+      - mdp_net
+    profiles: ["core"]
+
+  airflow_webserver:
+    image: apache/airflow:2.9.3
+    container_name: mdp_airflow_web
+    depends_on:
+      airflow_init:
+        condition: service_completed_successfully
+    ports:
+      - "${HOST_BIND}:${AIRFLOW_PORT}:8080"
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+    networks:
+      - mdp_net
+    command: bash -lc "airflow webserver"
+    profiles: ["core"]
+
+  airflow_scheduler:
+    image: apache/airflow:2.9.3
+    container_name: mdp_airflow_scheduler
+    depends_on:
+      airflow_init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+    networks:
+      - mdp_net
+    command: bash -lc "airflow scheduler"
+    profiles: ["core"]
+
+  # -------------------------
+  # dbt (Transformations)
+  # -------------------------
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.8.2
+    container_name: mdp_dbt
+    working_dir: /usr/app
+    volumes:
+      - ./dbt:/usr/app
+    environment:
+      DBT_PROFILES_DIR: /usr/app
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DB: ${PG_DB}
+    networks:
+      - mdp_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["--version"]
+    profiles: ["core"]
+
+  # -------------------------
+  # Superset (BI)
+  # -------------------------
+  superset:
+    image: apache/superset:4.0.2
+    container_name: mdp_superset
+    ports:
+      - "${HOST_BIND}:${SUPERSET_PORT}:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    volumes:
+      - superset_home:/app/superset_home
+    networks:
+      - mdp_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["bi"]
+
+  superset_init:
+    image: apache/superset:4.0.2
+    container_name: mdp_superset_init
+    depends_on:
+      superset:
+        condition: service_started
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    volumes:
+      - superset_home:/app/superset_home
+    networks:
+      - mdp_net
+    command:
+      - bash
+      - -lc
+      - >
+        superset db upgrade &&
+        superset fab create-admin
+        --username ${SUPERSET_ADMIN_USER}
+        --firstname Admin
+        --lastname Admin
+        --email ${SUPERSET_ADMIN_EMAIL}
+        --password ${SUPERSET_ADMIN_PASSWORD} || true &&
+        superset init
+    profiles: ["bi"]

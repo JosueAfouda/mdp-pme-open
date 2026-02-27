@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: employees
+      - name: products
+      - name: promotions
+      - name: sales
+      - name: sales_lines
+      - name: shifts
